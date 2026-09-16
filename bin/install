@@ -1,0 +1,429 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [OPTIONS]
+
+Install Claude Code extensions from this repository.
+
+Options:
+  --global              Install to ~/.claude/ (available in all projects)
+  --project PATH        Install to PATH/.claude/ (project-specific)
+  --only ITEM           Only install specific item(s) (can be repeated)
+                        e.g., --only skills/my-skill --only agents/reviewer
+  --uninstall           Remove installed symlinks
+  --list                List installed extensions
+  --dry-run             Show what would be done without doing it
+  -h, --help            Show this help
+
+Examples:
+  $(basename "$0") --global
+  $(basename "$0") --project ~/Projects/my-app
+  $(basename "$0") --global --only skills/my-skill
+  $(basename "$0") --uninstall --project ~/Projects/my-app
+  $(basename "$0") --list --global
+EOF
+    exit 0
+}
+
+# Parse arguments
+GLOBAL=false
+PROJECT_PATH=""
+ONLY=()
+UNINSTALL=false
+LIST=false
+DRY_RUN=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --global)     GLOBAL=true; shift ;;
+        --project)    PROJECT_PATH="$2"; shift 2 ;;
+        --only)       ONLY+=("$2"); shift 2 ;;
+        --uninstall)  UNINSTALL=true; shift ;;
+        --list)       LIST=true; shift ;;
+        --dry-run)    DRY_RUN=true; shift ;;
+        -h|--help)    usage ;;
+        *)            echo -e "${RED}Unknown option: $1${NC}"; usage ;;
+    esac
+done
+
+# Validate arguments
+if ! $GLOBAL && [[ -z "$PROJECT_PATH" ]]; then
+    echo -e "${RED}Error: Specify --global or --project PATH${NC}"
+    usage
+fi
+
+# Determine target directory
+if $GLOBAL; then
+    TARGET_DIR="$HOME/.claude"
+else
+    TARGET_DIR="$PROJECT_PATH/.claude"
+fi
+
+# Ensure target exists
+mkdir -p "$TARGET_DIR"
+
+# --- Helper functions ---
+
+symlink() {
+    local src="$1"
+    local dst="$2"
+
+    if $DRY_RUN; then
+        echo -e "  ${BLUE}[dry-run]${NC} $src -> $dst"
+        return
+    fi
+
+    mkdir -p "$(dirname "$dst")"
+
+    if [[ -L "$dst" ]]; then
+        local existing
+        existing="$(readlink "$dst")"
+        if [[ "$existing" == "$src" ]]; then
+            echo -e "  ${YELLOW}[skip]${NC} already linked: $(basename "$dst")"
+            return
+        fi
+        rm "$dst"
+    elif [[ -e "$dst" ]]; then
+        echo -e "  ${YELLOW}[backup]${NC} $(basename "$dst") -> $(basename "$dst").bak"
+        mv "$dst" "$dst.bak"
+    fi
+
+    ln -s "$src" "$dst"
+    echo -e "  ${GREEN}[link]${NC} $(basename "$dst")"
+}
+
+remove_symlink() {
+    local dst="$1"
+    local src_prefix="$REPO_DIR"
+
+    if [[ -L "$dst" ]]; then
+        local target
+        target="$(readlink "$dst")"
+        if [[ "$target" == "$src_prefix"* ]]; then
+            if $DRY_RUN; then
+                echo -e "  ${BLUE}[dry-run]${NC} would remove: $dst"
+            else
+                rm "$dst"
+                echo -e "  ${RED}[removed]${NC} $(basename "$dst")"
+            fi
+        fi
+    fi
+}
+
+should_install() {
+    local item="$1"
+    if [[ ${#ONLY[@]} -eq 0 ]]; then
+        return 0
+    fi
+    for pattern in "${ONLY[@]}"; do
+        if [[ "$item" == "$pattern"* ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# --- Install functions ---
+
+install_skills() {
+    local src_dir="$REPO_DIR/skills"
+    local dst_dir="$TARGET_DIR/skills"
+    [[ -d "$src_dir" ]] || return 0
+
+    echo -e "${GREEN}Skills:${NC}"
+    for skill_dir in "$src_dir"/*/; do
+        [[ -d "$skill_dir" ]] || continue
+        local name
+        name="$(basename "$skill_dir")"
+        should_install "skills/$name" || continue
+        symlink "$skill_dir" "$dst_dir/$name"
+    done
+}
+
+install_agents() {
+    local src_dir="$REPO_DIR/agents"
+    local dst_dir="$TARGET_DIR/agents"
+    [[ -d "$src_dir" ]] || return 0
+
+    echo -e "${GREEN}Agents:${NC}"
+    for agent_file in "$src_dir"/*.md; do
+        [[ -f "$agent_file" ]] || continue
+        local name
+        name="$(basename "$agent_file")"
+        should_install "agents/$name" || continue
+        symlink "$agent_file" "$dst_dir/$name"
+    done
+}
+
+install_rules() {
+    local src_dir="$REPO_DIR/rules"
+    local dst_dir="$TARGET_DIR/rules"
+    [[ -d "$src_dir" ]] || return 0
+
+    echo -e "${GREEN}Rules:${NC}"
+    for rule_file in "$src_dir"/*.md; do
+        [[ -f "$rule_file" ]] || continue
+        local name
+        name="$(basename "$rule_file")"
+        should_install "rules/$name" || continue
+        symlink "$rule_file" "$dst_dir/$name"
+    done
+}
+
+install_hooks() {
+    local src_dir="$REPO_DIR/hooks"
+    [[ -d "$src_dir" ]] || return 0
+
+    echo -e "${GREEN}Hooks:${NC}"
+    for hook_file in "$src_dir"/*.json; do
+        [[ -f "$hook_file" ]] || continue
+        local name
+        name="$(basename "$hook_file")"
+        should_install "hooks/$name" || continue
+
+        # Hooks need to be merged into settings.json
+        if $DRY_RUN; then
+            echo -e "  ${BLUE}[dry-run]${NC} would merge $name into settings.json"
+        else
+            merge_hooks "$hook_file" "$TARGET_DIR/settings.json"
+            echo -e "  ${GREEN}[merged]${NC} $name -> settings.json"
+        fi
+    done
+}
+
+merge_hooks() {
+    local hook_file="$1"
+    local settings_file="$2"
+
+    # Create settings.json if it doesn't exist
+    if [[ ! -f "$settings_file" ]]; then
+        echo '{}' > "$settings_file"
+    fi
+
+    # Use jq to merge hooks into settings if available
+    if command -v jq &>/dev/null; then
+        local hook_content
+        hook_content=$(cat "$hook_file")
+        local current
+        current=$(cat "$settings_file")
+
+        echo "$current" | jq --argjson hooks "$hook_content" '
+            .hooks = (.hooks // {}) |
+            .hooks = reduce ($hooks | to_entries[]) as $entry (.hooks;
+                .[$entry.key] = ((.[$entry.key] // []) + $entry.value)
+            )
+        ' > "$settings_file.tmp" && mv "$settings_file.tmp" "$settings_file"
+    else
+        echo -e "  ${YELLOW}[warn]${NC} jq not found; hook merging requires jq. Skipping."
+    fi
+}
+
+install_mcp() {
+    local src_dir="$REPO_DIR/mcp"
+    [[ -d "$src_dir" ]] || return 0
+
+    echo -e "${GREEN}MCP Servers:${NC}"
+
+    local target_file
+    if $GLOBAL; then
+        target_file="$HOME/.claude.json"
+    else
+        target_file="$PROJECT_PATH/.mcp.json"
+    fi
+
+    for mcp_file in "$src_dir"/*.json; do
+        [[ -f "$mcp_file" ]] || continue
+        local name
+        name="$(basename "$mcp_file" .json)"
+        should_install "mcp/$name" || continue
+
+        if $DRY_RUN; then
+            echo -e "  ${BLUE}[dry-run]${NC} would merge $name into $(basename "$target_file")"
+        else
+            merge_mcp "$mcp_file" "$target_file"
+            echo -e "  ${GREEN}[merged]${NC} $name -> $(basename "$target_file")"
+        fi
+    done
+}
+
+merge_mcp() {
+    local mcp_file="$1"
+    local target_file="$2"
+
+    if [[ ! -f "$target_file" ]]; then
+        echo '{}' > "$target_file"
+    fi
+
+    if command -v jq &>/dev/null; then
+        local mcp_content
+        mcp_content=$(cat "$mcp_file")
+        local current
+        current=$(cat "$target_file")
+
+        echo "$current" | jq --argjson servers "$mcp_content" '
+            .mcpServers = (.mcpServers // {}) * $servers
+        ' > "$target_file.tmp" && mv "$target_file.tmp" "$target_file"
+    else
+        echo -e "  ${YELLOW}[warn]${NC} jq not found; MCP merging requires jq. Skipping."
+    fi
+}
+
+install_plugins() {
+    local src_dir="$REPO_DIR/plugins"
+    [[ -d "$src_dir" ]] || return 0
+
+    echo -e "${GREEN}Plugins:${NC}"
+    echo -e "  ${YELLOW}[info]${NC} Plugins must be installed via 'claude plugin add <path>'"
+    for plugin_dir in "$src_dir"/*/; do
+        [[ -d "$plugin_dir" ]] || continue
+        local name
+        name="$(basename "$plugin_dir")"
+        should_install "plugins/$name" || continue
+        echo -e "  ${BLUE}->  ${NC} claude plugin add $plugin_dir"
+    done
+}
+
+# --- Uninstall functions ---
+
+uninstall_all() {
+    echo -e "${RED}Uninstalling from $TARGET_DIR:${NC}"
+
+    echo -e "${GREEN}Skills:${NC}"
+    if [[ -d "$TARGET_DIR/skills" ]]; then
+        for item in "$TARGET_DIR/skills"/*/; do
+            [[ -d "$item" ]] || continue
+            remove_symlink "${item%/}"
+        done
+    fi
+
+    echo -e "${GREEN}Agents:${NC}"
+    if [[ -d "$TARGET_DIR/agents" ]]; then
+        for item in "$TARGET_DIR/agents"/*.md; do
+            [[ -f "$item" ]] || continue
+            remove_symlink "$item"
+        done
+    fi
+
+    echo -e "${GREEN}Rules:${NC}"
+    if [[ -d "$TARGET_DIR/rules" ]]; then
+        for item in "$TARGET_DIR/rules"/*.md; do
+            [[ -f "$item" ]] || continue
+            remove_symlink "$item"
+        done
+    fi
+
+    echo -e "${YELLOW}Note: Hook and MCP merges must be manually removed from settings.json / .mcp.json${NC}"
+}
+
+# --- List function ---
+
+list_installed() {
+    echo -e "${BLUE}Installed extensions in $TARGET_DIR:${NC}"
+    echo ""
+
+    echo -e "${GREEN}Skills:${NC}"
+    if [[ -d "$TARGET_DIR/skills" ]]; then
+        for item in "$TARGET_DIR/skills"/*/; do
+            [[ -d "$item" ]] || continue
+            local name
+            name="$(basename "$item")"
+            if [[ -L "${item%/}" ]]; then
+                local target
+                target="$(readlink "${item%/}")"
+                if [[ "$target" == "$REPO_DIR"* ]]; then
+                    echo -e "  ${GREEN}*${NC} $name (from this repo)"
+                else
+                    echo -e "    $name (external: $target)"
+                fi
+            else
+                echo -e "    $name (local)"
+            fi
+        done
+    else
+        echo "  (none)"
+    fi
+
+    echo -e "${GREEN}Agents:${NC}"
+    if [[ -d "$TARGET_DIR/agents" ]]; then
+        for item in "$TARGET_DIR/agents"/*.md; do
+            [[ -f "$item" ]] || continue
+            local name
+            name="$(basename "$item" .md)"
+            if [[ -L "$item" ]]; then
+                local target
+                target="$(readlink "$item")"
+                if [[ "$target" == "$REPO_DIR"* ]]; then
+                    echo -e "  ${GREEN}*${NC} $name (from this repo)"
+                else
+                    echo -e "    $name (external: $target)"
+                fi
+            else
+                echo -e "    $name (local)"
+            fi
+        done
+    else
+        echo "  (none)"
+    fi
+
+    echo -e "${GREEN}Rules:${NC}"
+    if [[ -d "$TARGET_DIR/rules" ]]; then
+        for item in "$TARGET_DIR/rules"/*.md; do
+            [[ -f "$item" ]] || continue
+            local name
+            name="$(basename "$item" .md)"
+            if [[ -L "$item" ]]; then
+                local target
+                target="$(readlink "$item")"
+                if [[ "$target" == "$REPO_DIR"* ]]; then
+                    echo -e "  ${GREEN}*${NC} $name (from this repo)"
+                else
+                    echo -e "    $name (external: $target)"
+                fi
+            else
+                echo -e "    $name (local)"
+            fi
+        done
+    else
+        echo "  (none)"
+    fi
+}
+
+# --- Main ---
+
+echo -e "${BLUE}Claude Code Extension Manager${NC}"
+echo -e "Repository: $REPO_DIR"
+echo -e "Target:     $TARGET_DIR"
+echo ""
+
+if $LIST; then
+    list_installed
+    exit 0
+fi
+
+if $UNINSTALL; then
+    uninstall_all
+    exit 0
+fi
+
+# Install
+install_skills
+install_agents
+install_rules
+install_hooks
+install_mcp
+install_plugins
+
+echo ""
+echo -e "${GREEN}Done!${NC}"

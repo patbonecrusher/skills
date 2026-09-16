@@ -1,0 +1,13 @@
+{
+  "name": "patbonecrusher",
+  "owner": { "name": "Patrick Laplante", "url": "https://github.com/patbonecrusher" },
+  "metadata": { "description": "Pat's Claude Code plugins" },
+  "plugins": [
+    {
+      "name": "mac-app-kit",
+      "source": "./plugins/mac-app-kit",
+      "description": "Scaffold, sign, notarize and ship native macOS apps (App Store, Homebrew, GitHub Pages).",
+      "category": "development"
+    }
+  ]
+}

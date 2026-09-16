@@ -1,0 +1,8 @@
+{
+  "name": "mac-app-kit",
+  "version": "1.0.0",
+  "description": "Build, sign, notarize, ship native macOS apps: scaffold a project with GitHub repo + Pages site, Developer ID signing, Mac App Store submission with listing automation, Homebrew cask releases.",
+  "author": { "name": "Patrick Laplante", "url": "https://github.com/patbonecrusher" },
+  "homepage": "https://github.com/patbonecrusher/skills",
+  "keywords": ["macos", "swift", "app-store", "notarization", "homebrew", "codesign"]
+}

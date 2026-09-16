@@ -1,0 +1,13 @@
+{
+  "subtitle": "__SUBTITLE__",
+  "description": "__DESCRIPTION__",
+  "promotionalText": "__PROMO__",
+  "keywords": "__KEYWORDS__",
+  "supportUrl": "https://github.com/__GITHUB_USER__/__REPO__/issues",
+  "marketingUrl": "__SITE_URL__",
+  "privacyPolicyUrl": "__SITE_URL__privacy.html",
+  "primaryCategory": "__CATEGORY_ASC__",
+  "secondaryCategory": null,
+  "copyright": "__YEAR__ __AUTHOR__",
+  "reviewNotes": "No account or setup required. Launch the app and use it directly."
+}
