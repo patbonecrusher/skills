@@ -1,16 +1,15 @@
 # Releasing __APP_NAME__
 
-Team **__TEAM_ID__**. Bundle ID `__BUNDLE_ID__`. Everything is driven by `build.sh`; see `./build.sh --help`.
+Bundle ID `__BUNDLE_ID__`. Everything is driven by `build.sh`; see `./build.sh --help`. Personal settings (`TEAM_ID`, `ASC_KEY_ID`,
+`ASC_ISSUER_ID`, `TAP_DIR`) come from `~/.config/mac-app-kit/defaults.env` or `./.release.env` (git-ignored).
 
 ## Direct download (Developer ID + notarization) and Homebrew
 
 ```sh
-export ASC_KEY_ID=… ASC_ISSUER_ID=…          # App Store Connect API key (~/.appstoreconnect/private_keys/AuthKey_<id>.p8)
 Tools/release.sh                              # notarized universal zip → GitHub release → cask update in the tap
 ```
 
-Needs a *Developer ID Application* certificate in the keychain and the tap checked out at `../mdview/homebrew-tap`
-(override with `TAP_DIR`). Install: `brew install --cask __GITHUB_USER__/tap/__CASK__`.
+Needs a *Developer ID Application* certificate in the keychain and the Homebrew tap checked out at `$TAP_DIR`. Install: `brew install --cask __GITHUB_USER__/tap/__CASK__`.
 
 ## Mac App Store
 

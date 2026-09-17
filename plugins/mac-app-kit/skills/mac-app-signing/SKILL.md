@@ -71,4 +71,4 @@ template workflow in `${CLAUDE_PLUGIN_ROOT}/templates/app/.github/workflows/buil
 
 - Don't copy a downloaded provisioning profile or asset into the bundle without `xattr -c` — quarantine xattrs break App Store uploads (ITMS-91109) and can trip notarization.
 - Don't launch a distribution-signed (App Store) build locally to test — it won't start. Developer ID builds do run locally.
-- Don't reuse `mdview`'s CI `.p12` for another team; check the team ID inside the cert first.
+- Don't reuse a `.p12` from another project without checking the team ID inside the cert first.

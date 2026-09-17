@@ -9,7 +9,9 @@
 # (public, with GitHub Pages serving docs/), and pushes. Prints what to do next.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; TPL="$HERE/../templates/app"
-NAME="" BUNDLE="" REPO="" USER_="" AUTHOR="" TEAM="" CATEGORY="public.app-category.utilities" TAGLINE="" DIR="" GITHUB=1 PRIVATE=0
+# Personal defaults (TEAM_ID, GITHUB_USER, AUTHOR, BUNDLE_PREFIX, TAP_DIR, ASC_*) — never committed anywhere.
+[[ -f "$HOME/.config/mac-app-kit/defaults.env" ]] && source "$HOME/.config/mac-app-kit/defaults.env"
+NAME="" BUNDLE="" REPO="" USER_="${GITHUB_USER:-}" AUTHOR="${AUTHOR:-}" TEAM="${TEAM_ID:-}" CATEGORY="public.app-category.utilities" TAGLINE="" DIR="" GITHUB=1 PRIVATE=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --name) NAME=$2; shift 2 ;; --bundle-id) BUNDLE=$2; shift 2 ;; --repo) REPO=$2; shift 2 ;;
@@ -19,8 +21,13 @@ while [[ $# -gt 0 ]]; do
     *) echo "unknown option $1" >&2; exit 1 ;;
   esac
 done
-for v in NAME BUNDLE REPO USER_ AUTHOR TEAM; do [[ -n ${(P)v} ]] || { echo "missing --${v:l}" >&2; exit 1; }; done
-EXEC="${NAME//[^A-Za-z0-9]/}"; DIR="${DIR:-$PWD/$REPO}"; CASK="$REPO"
+EXEC="${NAME//[^A-Za-z0-9]/}"
+[[ -n $BUNDLE ]] || { [[ -n ${BUNDLE_PREFIX:-} ]] && BUNDLE="$BUNDLE_PREFIX.$EXEC"; }
+[[ -n $REPO ]] || REPO="$(printf '%s' "$NAME" | tr '[:upper:] ' '[:lower:]-')"
+[[ -n $USER_ ]] || USER_="$(gh api user -q .login 2>/dev/null || true)"
+[[ -n $AUTHOR ]] || AUTHOR="$(git config user.name || true)"
+for v in NAME BUNDLE USER_ AUTHOR TEAM; do [[ -n ${(P)v} ]] || { echo "missing --${${v:l}//_/} (or set it in ~/.config/mac-app-kit/defaults.env)" >&2; exit 1; }; done
+DIR="${DIR:-$PWD/$REPO}"; CASK="$REPO"
 INITIAL="${NAME[1]:u}"; YEAR="$(date +%Y)"; DATE="$(date '+%B %-d, %Y')"; SITE="https://$USER_.github.io/$REPO/"
 case "$CATEGORY" in
   *graphics-design) ASC=GRAPHICS_AND_DESIGN ;; *developer-tools) ASC=DEVELOPER_TOOLS ;; *productivity) ASC=PRODUCTIVITY ;;
@@ -44,6 +51,7 @@ find "$DIR" -type f \( -name "*.swift" -o -name "*.plist" -o -name "*.sh" -o -na
 chmod +x "$DIR/build.sh" "$DIR/Tools/release.sh" "$DIR/Tools/asc.py"
 echo "==> Building once"
 ( cd "$DIR" && ./build.sh >/dev/null && echo "    build ok: build/$NAME.app" )
+printf 'TEAM_ID=%s\n' "$TEAM" > "$DIR/.release.env"      # git-ignored; per-project override of the personal defaults
 ( cd "$DIR" && git init -q -b main && git add -A && git commit -q -m "Scaffold $NAME (mac-app-kit)" )
 if [[ $GITHUB == 1 ]]; then
   echo "==> Creating GitHub repo $USER_/$REPO"

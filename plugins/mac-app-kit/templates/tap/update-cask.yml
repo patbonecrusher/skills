@@ -1,17 +1,19 @@
 name: Update Cask
 
+# Rewrites version + sha256 of a cask after a GitHub release. Trigger from CI with
+#   gh api repos/<user>/homebrew-tap/dispatches -f event_type=update-cask -f client_payload[version]=1.2 -f client_payload[cask]=my-app
+# or manually via "Run workflow". Add one `case` line per cask below.
 on:
   repository_dispatch:
     types: [update-cask]
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g. 0.2.2)'
+        description: 'Release version (e.g. 1.2)'
         required: true
       cask:
-        description: 'Cask file name without .rb (mdviewer, __REPO__)'
-        required: false
-        default: 'mdviewer'
+        description: 'Cask file name without .rb'
+        required: true
 
 jobs:
   update:
@@ -20,40 +22,31 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-
       - name: Determine version and cask
-        id: version
+        id: v
         run: |
-          VERSION="${{ github.event.client_payload.version }}"
-          [ -n "$VERSION" ] || VERSION="${{ github.event.inputs.version }}"
-          CASK="${{ github.event.client_payload.cask }}"
-          [ -n "$CASK" ] || CASK="${{ github.event.inputs.cask }}"
-          [ -n "$CASK" ] || CASK="mdviewer"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "cask=$CASK" >> "$GITHUB_OUTPUT"
-
+          VERSION="${{ github.event.client_payload.version }}"; [ -n "$VERSION" ] || VERSION="${{ github.event.inputs.version }}"
+          CASK="${{ github.event.client_payload.cask }}";       [ -n "$CASK" ]    || CASK="${{ github.event.inputs.cask }}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"; echo "cask=$CASK" >> "$GITHUB_OUTPUT"
       - name: Download and compute SHA256
         id: sha
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          case "${{ steps.version.outputs.cask }}" in
-            __REPO__) URL="https://github.com/__GITHUB_USER__/__REPO__/releases/download/v${VERSION}/__EXEC_NAME__-${VERSION}.zip" ;;
-            *)          URL="https://github.com/__GITHUB_USER__/mdview/releases/download/v${VERSION}/MdViewer-macos-swift-arm64.tar.gz" ;;
+          VERSION="${{ steps.v.outputs.version }}"
+          case "${{ steps.v.outputs.cask }}" in
+            __CASK__) URL="https://github.com/__GITHUB_USER__/__REPO__/releases/download/v${VERSION}/__EXEC_NAME__-${VERSION}.zip" ;;
+            *) echo "unknown cask" >&2; exit 1 ;;
           esac
           SHA=$(curl -fsSL "$URL" | shasum -a 256 | cut -d' ' -f1)
           [ -n "$SHA" ] || { echo "download failed: $URL" >&2; exit 1; }
           echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
-
       - name: Update cask formula
         run: |
-          FILE="Casks/${{ steps.version.outputs.cask }}.rb"
-          sed -i "s/version \".*\"/version \"${{ steps.version.outputs.version }}\"/" "$FILE"
+          FILE="Casks/${{ steps.v.outputs.cask }}.rb"
+          sed -i "s/version \".*\"/version \"${{ steps.v.outputs.version }}\"/" "$FILE"
           sed -i "s/sha256 .*/sha256 \"${{ steps.sha.outputs.sha256 }}\"/" "$FILE"
-
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Casks
-          git commit -m "Update ${{ steps.version.outputs.cask }} cask to v${{ steps.version.outputs.version }}" || exit 0
+          git add Casks && git commit -m "Update ${{ steps.v.outputs.cask }} cask to v${{ steps.v.outputs.version }}" || exit 0
           git push

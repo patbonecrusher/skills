@@ -23,7 +23,7 @@ at a time, and verify each with a command before moving on. Read `reference.md` 
    Check: `security cms -D -i profile | plutil -p -` (TeamIdentifier, application-identifier, DeveloperCertificates).
 4. **App record** (appstoreconnect.apple.com → My Apps → + → New App): macOS, name (may need a suffix if taken), bundle ID, SKU.
 5. **API key** (Users and Access → Integrations → App Store Connect API → +, role App Manager): `.p8` downloadable once →
-   `~/.appstoreconnect/private_keys/AuthKey_<KEYID>.p8`; note Key ID and Issuer ID. `export ASC_KEY_ID=… ASC_ISSUER_ID=…`.
+   `~/.appstoreconnect/private_keys/AuthKey_<KEYID>.p8`; note Key ID and Issuer ID. `export ASC_KEY_ID=… ASC_ISSUER_ID=…` (or keep them in `~/.config/mac-app-kit/defaults.env`).
 6. **Build + upload**: `./build.sh --universal --sign appstore --pkg --upload` (validate → upload via `xcrun altool`).
    Delivery is accepted async — processing takes 10–40 min; a *rejection email* arrives instead of a build appearing.
    Check email if no build shows after ~30 min (`Tools/asc.py status`).
@@ -63,7 +63,7 @@ App Review Information → Notes (`Tools/asc.py review-info` does it) AND paste 
 attached — the reply thread has no public API, the user does that part.
 
 Recording: `${CLAUDE_PLUGIN_ROOT}/scripts/record-demo.sh` drives the app with an AppleScript (`demo-example.applescript`) while
-`screencapture -v` records. Needs the terminal app (Ghostty for Pat) in Accessibility; the user must stay hands-off (keystrokes go to
+`screencapture -v` records. Needs the terminal app hosting Claude in System Settings → Privacy & Security → Accessibility; the user must stay hands-off (keystrokes go to
 the frontmost app); hide other apps first; record the display the windows are on (`-D 1` main, `-D 2` built-in); make Open-panel
 steps wait for a new document window; watch for leftover files causing "Replace?" sheets; trim the tail with ffmpeg; review frames.
 

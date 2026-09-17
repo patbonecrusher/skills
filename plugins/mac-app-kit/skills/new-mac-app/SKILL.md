@@ -13,14 +13,18 @@ Developer ID, the Mac App Store and Homebrew already wired in.
 
 ## Gather inputs (ask only for what's missing; infer the rest)
 
+Personal defaults come from `~/.config/mac-app-kit/defaults.env` (`TEAM_ID`, `GITHUB_USER`, `AUTHOR`, `BUNDLE_PREFIX`,
+`TAP_DIR`, `ASC_KEY_ID`, `ASC_ISSUER_ID`); the scripts source it. If it is missing, ask once and offer to create it. Never
+commit those values into a repo.
+
 | Input | Default |
 | --- | --- |
 | App name | from the request |
-| Bundle ID | `com.<author-domain>.<ExecName>` — Pat uses `com.patlaplante.<ExecName>` |
+| Bundle ID | `$BUNDLE_PREFIX.<ExecName>` |
 | Repo slug | kebab-case of the name |
 | GitHub user | `gh api user -q .login` |
 | Author | `git config user.name` |
-| Team ID | the team in `security find-identity -v -p codesigning` (parenthesized code on *Apple Distribution* / *Developer ID* certs — NOT the one on "Apple Development", that's a personal ID). Pat: `TEAMID`. |
+| Team ID | `$TEAM_ID`; otherwise the parenthesized code on *Apple Distribution* / *Developer ID* certs in `security find-identity -v -p codesigning` (NOT the one on "Apple Development" — that's a personal ID) |
 | Category | `public.app-category.utilities` unless obvious |
 | Tagline | one sentence; used for site, listing and repo description |
 
@@ -62,7 +66,7 @@ Developer ID, the Mac App Store and Homebrew already wired in.
 
 ## Gotchas learned the hard way
 
-- `ls` may be aliased (eza) in Pat's shell; use `/bin/ls` in scripts. `rm` is aliased to `trash` — use `/bin/rm`.
+- Shells often alias `ls`/`rm` (eza, trash); use `/bin/ls` and `/bin/rm` in scripts.
 - SwiftUI `DocumentGroup(viewing:)` shows the Open panel on launch; `applicationShouldOpenUntitledFile` → false.
 - `keyboardShortcut("+", modifiers: .command)` works for Zoom In (SwiftUI matches the shifted character).
 - Menu `Picker` inside `Menu` with `.pickerStyle(.inline)` renders as radio items; put it in both the View menu and toolbar.

@@ -1,7 +1,7 @@
 {
   "name": "patbonecrusher",
   "owner": { "name": "Patrick Laplante", "url": "https://github.com/patbonecrusher" },
-  "metadata": { "description": "Pat's Claude Code plugins" },
+  "metadata": { "description": "Claude Code plugins" },
   "plugins": [
     {
       "name": "mac-app-kit",

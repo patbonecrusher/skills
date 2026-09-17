@@ -6,8 +6,8 @@ allowed-tools: Bash, Read, Edit, Write, Glob, Grep
 
 # Homebrew cask release
 
-Pat's tap: `patbonecrusher/homebrew-tap` (checked out at `~/Projects/mdview/homebrew-tap`), installed as
-`brew install --cask patbonecrusher/tap/<cask>`. Casks live in `Casks/<cask>.rb`; formulas in `Formula/`.
+The user's tap is `<GITHUB_USER>/homebrew-tap`, checked out at `$TAP_DIR` (from `~/.config/mac-app-kit/defaults.env`), installed as
+`brew install --cask <GITHUB_USER>/tap/<cask>`. Casks live in `Casks/<cask>.rb`; formulas in `Formula/`.
 
 ## Prerequisites
 - A notarized, stapled build people can download — a Developer ID zip on a GitHub release (see mac-app-signing). App Store
@@ -33,13 +33,13 @@ brew tap USER/tap && brew fetch --cask USER/tap/<cask>     # checks URL + sha256
 brew audit --cask --online USER/tap/<cask>
 ditto -x -k "$(brew --cache --cask USER/tap/<cask>)" /tmp/x && spctl --assess --type execute -v "/tmp/x/Name.app"   # notarized?
 ```
-Don't `brew install` on Pat's machine as a test — his packages are managed by chezmoi (use the chezmoi skill if he wants it installed).
+Don't `brew install` on the user's machine as a test if their packages are managed declaratively (e.g. chezmoi) — use that workflow instead.
 
 ## Tap automation
 `.github/workflows/update-cask.yml` in the tap (template: `${CLAUDE_PLUGIN_ROOT}/templates/tap/update-cask.yml`) accepts
 `repository_dispatch` `update-cask` with `client_payload.version` and `.cask`, downloads the asset, rewrites version + sha256,
-commits. Triggering it from another repo's CI needs a PAT secret (`HOMEBREW_TAP_TOKEN`, repo scope on the tap) — mdview's
-workflow references one that was never created, so its step silently fails; the local `release.sh` path avoids the token entirely.
+commits. Triggering it from another repo's CI needs a PAT secret (`HOMEBREW_TAP_TOKEN`, repo scope on the tap); the local `release.sh`
+path avoids the token entirely.
 
 ## Gotchas
 - `sha256` must be of the exact uploaded asset; recompute after any re-upload (`shasum -a 256 file.zip`).
