@@ -19,6 +19,7 @@ bin/             # Install/management scripts
 | Plugin | What it does |
 | --- | --- |
 | [`mac-app-kit`](plugins/mac-app-kit) | Scaffold, sign, notarize and ship native macOS apps: GitHub repo + Pages site, Developer ID, Mac App Store submission with listing automation, Homebrew casks |
+| [`skill-tools`](plugins/skill-tools) | Read-only security and quality review of a skill/plugin repo (GitHub URL or path) before you install it |
 
 Install a plugin from this repo's marketplace inside Claude Code:
 

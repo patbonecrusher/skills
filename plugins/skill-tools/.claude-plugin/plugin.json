@@ -1,0 +1,8 @@
+{
+  "name": "skill-tools",
+  "version": "1.0.0",
+  "description": "Tools for working with Claude Code skills and plugins: read-only security and quality review of a skill/plugin repo before you install it.",
+  "author": { "name": "Patrick Laplante", "url": "https://github.com/patbonecrusher" },
+  "homepage": "https://github.com/patbonecrusher/skills",
+  "keywords": ["skills", "plugins", "security", "review", "audit", "prompt-injection"]
+}

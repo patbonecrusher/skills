@@ -1,13 +1,24 @@
 {
   "name": "patbonecrusher",
-  "owner": { "name": "Patrick Laplante", "url": "https://github.com/patbonecrusher" },
-  "metadata": { "description": "Claude Code plugins" },
+  "owner": {
+    "name": "Patrick Laplante",
+    "url": "https://github.com/patbonecrusher"
+  },
+  "metadata": {
+    "description": "Claude Code plugins"
+  },
   "plugins": [
     {
       "name": "mac-app-kit",
       "source": "./plugins/mac-app-kit",
       "description": "Scaffold, sign, notarize and ship native macOS apps (App Store, Homebrew, GitHub Pages).",
       "category": "development"
+    },
+    {
+      "name": "skill-tools",
+      "source": "./plugins/skill-tools",
+      "description": "Read-only security and quality review of Claude Code skill/plugin repos before installing them.",
+      "category": "security"
     }
   ]
 }
