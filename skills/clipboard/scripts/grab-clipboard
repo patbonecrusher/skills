@@ -1,0 +1,81 @@
+#!/usr/bin/osascript -l JavaScript
+// Snapshot the macOS clipboard into a fresh temp dir and print what was saved.
+// Files copied in Finder are reported by their original path (not copied);
+// images are written as PNG; text (and HTML, when present) as files.
+// Output: one line per item, `<kind>\t<path>\t<details>`, or `empty`.
+
+ObjC.import('AppKit')
+ObjC.import('Foundation')
+
+function run() {
+  const pb = $.NSPasteboard.generalPasteboard
+  const fm = $.NSFileManager.defaultManager
+  const types = ObjC.deepUnwrap(pb.types) || []
+  const has = t => types.indexOf(t) !== -1
+
+  const tmp = ObjC.unwrap($.NSProcessInfo.processInfo.environment.objectForKey('TMPDIR')) || '/tmp/'
+  const root = tmp.replace(/\/?$/, '/') + 'claude-clipboard'
+  const fmt = $.NSDateFormatter.alloc.init
+  fmt.dateFormat = 'yyyyMMdd-HHmmss-SSS'
+  const dir = root + '/' + ObjC.unwrap(fmt.stringFromDate($.NSDate.date))
+  fm.createDirectoryAtPathWithIntermediateDirectoriesAttributesError(dir, true, $(), $())
+  prune(fm, root, 20)
+
+  const out = []
+
+  // 1. Files copied in Finder: report the originals.
+  const urls = pb.readObjectsForClassesOptions($([$.NSURL]), $({ NSPasteboardURLReadingFileURLsOnlyKey: true }))
+  const files = []
+  for (let i = 0; !urls.isNil() && i < urls.count; i++) files.push(ObjC.unwrap(urls.objectAtIndex(i).path))
+  files.forEach(p => {
+    const isDir = Ref()
+    const exists = fm.fileExistsAtPathIsDirectory(p, isDir)
+    out.push([isDir[0] ? 'directory' : 'file', p, exists ? '' : 'missing'].join('\t'))
+  })
+
+  // 2. Image data (skipped when files were copied: Finder also puts their icons here).
+  if (!files.length) {
+    let png = null
+    if (has('public.png')) png = pb.dataForType('public.png')
+    else if (has('public.tiff')) {
+      const rep = $.NSBitmapImageRep.imageRepWithData(pb.dataForType('public.tiff'))
+      if (!rep.isNil()) png = rep.representationUsingTypeProperties($.NSBitmapImageFileTypePNG, $())
+    }
+    if (png && !png.isNil()) {
+      const p = dir + '/clipboard.png'
+      png.writeToFileAtomically(p, true)
+      const rep = $.NSBitmapImageRep.imageRepWithData(png)
+      out.push(['image', p, rep.isNil() ? '' : `${rep.pixelsWide}x${rep.pixelsHigh}`].join('\t'))
+    }
+  }
+
+  // 3. Text, plus HTML when the source provided rich content.
+  const text = pb.stringForType('public.utf8-plain-text')
+  if (!text.isNil() && !files.length) {
+    const s = ObjC.unwrap(text)
+    const p = dir + '/clipboard.txt'
+    text.writeToFileAtomicallyEncodingError(p, true, $.NSUTF8StringEncoding, $())
+    const lines = s.split('\n').length - (s.endsWith('\n') ? 1 : 0)
+    out.push(['text', p, `${s.length} chars, ${lines} lines`].join('\t'))
+  }
+  if (has('public.html') && !files.length) {
+    const html = pb.stringForType('public.html')
+    if (!html.isNil()) {
+      const p = dir + '/clipboard.html'
+      html.writeToFileAtomicallyEncodingError(p, true, $.NSUTF8StringEncoding, $())
+      out.push(['html', p, `${ObjC.unwrap(html).length} chars`].join('\t'))
+    }
+  }
+
+  if (!out.length) {
+    fm.removeItemAtPathError(dir, $())
+    return types.length ? `empty\t\tunsupported types: ${types.join(', ')}` : 'empty'
+  }
+  return out.join('\n')
+}
+
+// Keep only the newest `keep` snapshot dirs.
+function prune(fm, root, keep) {
+  const names = (ObjC.deepUnwrap(fm.contentsOfDirectoryAtPathError(root, $())) || []).sort()
+  names.slice(0, Math.max(0, names.length - keep)).forEach(n => fm.removeItemAtPathError(root + '/' + n, $()))
+}
